@@ -1,0 +1,6 @@
+#!/bin/sh
+# Vérification d'anonymat avant chaque push.
+set -e
+npm test --silent
+npm run build --silent
+node scripts/check-anon.mjs
