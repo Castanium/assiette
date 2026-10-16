@@ -16,32 +16,32 @@ const grammes = (r: ReturnType<typeof equilibrer>, cat: string) => r.complements
 
 describe('acceptation : gyozas avec le profil type', () => {
   const r = equilibrer(entree(gyozas))
-  it('budget hors légumes : G 81,75 / L 23,1', () => {
-    expect(budget.g - r.legumes.apport.g).toBeCloseTo(81.75)
-    expect(budget.l - r.legumes.apport.l).toBeCloseTo(23.1)
+  it('budget hors légumes : G 86,25 / L 23,4', () => {
+    expect(budget.g - r.legumes.apport.g).toBeCloseTo(86.25)
+    expect(budget.l - r.legumes.apport.l).toBeCloseTo(23.4)
   })
-  it('310 g, limité par les glucides', () => {
-    expect(r.quantite).toBe(310) // 81,75 / 0,26 = 314 → 310
+  it('330 g, limité par les glucides', () => {
+    expect(r.quantite).toBe(330) // 86,25 / 0,26 = 331,7 → 330 (lipides : 23,4 / 0,06 = 390)
     expect(r.limitante).toBe('g')
   })
   it('poulet pour le reste des protéines, ni féculent ni huile', () => {
-    // reste P = 49,5 − 21,7 = 27,8 g → 27,8 / 0,29 = 96 → 95 g ; reste L ≈ 1,65 g → huile < 3 g
+    // reste P = 51 − 23,1 = 27,9 g → 27,9 / 0,29 = 96,2 → 95 g ; reste L = 23,4 − 19,8 − 2,85 ≈ 0,75 g → huile < 3 g
     expect(grammes(r, 'proteine')).toBe(95)
     expect(grammes(r, 'feculent')).toBeUndefined()
     expect(grammes(r, 'gras')).toBeUndefined()
     expect(r.verifierSaisie).toBe(false)
   })
-  it('avec la tolérance par défaut de 10 % : 345 g', () => {
-    expect(equilibrer(entree(gyozas, { tolerance: 0.1 })).quantite).toBe(345)
+  it('avec la tolérance par défaut de 10 % : 360 g', () => {
+    expect(equilibrer(entree(gyozas, { tolerance: 0.1 })).quantite).toBe(360) // 94,9 / 0,26 = 364,9 → 360
   })
 })
 
 describe('légumes', () => {
-  it('300 g par repas, macros retirées du budget avant le calcul du plat', () => {
+  it('200 g par repas, macros retirées du budget avant le calcul du plat', () => {
     const r = equilibrer(entree({ g: 50, p: 5, l: 1 }))
-    expect(r.legumes.grammes).toBe(300)
-    expect(r.legumes.apport).toEqual({ g: 13.5, p: 4.5, l: expect.closeTo(0.9) })
-    expect(r.quantite).toBe(Math.floor((budget.g - 13.5) / 0.5 / 5) * 5)
+    expect(r.legumes.grammes).toBe(200)
+    expect(r.legumes.apport).toEqual({ g: 9, p: 3, l: expect.closeTo(0.6) })
+    expect(r.quantite).toBe(Math.floor((budget.g - 9) / 0.5 / 5) * 5)
   })
 })
 
@@ -50,12 +50,13 @@ describe('protéines', () => {
     const steak: Macros = { g: 10, p: 25, l: 8 }
     const r = equilibrer(entree(steak))
     expect(r.limitante).toBe('l')
-    expect(r.quantite).toBe(285)
+    expect(r.quantite).toBe(290) // lipides : 23,4 / 0,08 = 292,5
     expect(r.plat.p).toBeGreaterThan(budget.p)
     expect(r.proteinesAuDessus).toBe(true)
     expect(grammes(r, 'proteine')).toBeUndefined()
-    // sans la dette protéinée, il faudrait (81,75 − 28,5) / 0,29 ≈ 185 g de riz
-    expect(grammes(r, 'feculent')).toBe(110)
+    // dette : 72,5 − 51 = 21,5 g de protéines en trop → (86,25 − 29 − 21,5) / 0,29 = 123 → 125 g
+    // (sans la dette, il faudrait ≈ 195 g de riz)
+    expect(grammes(r, 'feculent')).toBe(125)
   })
   it('protéine toujours proposée si le plat en couvre moins de la moitié', () => {
     const r = equilibrer(entree({ g: 30, p: 1, l: 2 }))
@@ -79,12 +80,12 @@ describe('calcul et saisie', () => {
   it('aliment sans glucides ni lipides : limité par les protéines', () => {
     const r = equilibrer(entree({ g: 0, p: 11, l: 0 }))
     expect(r.limitante).toBe('p')
-    expect(r.quantite).toBe(450) // 49,5 / 0,11
+    expect(r.quantite).toBe(460) // 51 / 0,11 = 463,6
   })
   it('mode inverse avec dépassement', () => {
     const r = equilibrer(entree(gyozas, { quantiteImposee: 400 }))
     expect(r.quantite).toBe(400)
-    expect(r.depassement.g).toBeCloseTo(104 - 81.75)
+    expect(r.depassement.g).toBeCloseTo(104 - 86.25)
     expect(grammes(r, 'feculent')).toBeUndefined()
     expect(r.conseils.join(' ')).toMatch(/Pas de féculents en plus/)
   })
@@ -100,6 +101,6 @@ describe('calcul et saisie', () => {
   })
   it('alerte si le total s’écarte de plus de 25 % de l’assiette type', () => {
     expect(equilibrer(entree(gyozas, { quantiteImposee: 700 })).verifierSaisie).toBe(true)
-    expect(equilibrer(entree(gyozas, { quantiteImposee: 310 })).verifierSaisie).toBe(false)
+    expect(equilibrer(entree(gyozas, { quantiteImposee: 330 })).verifierSaisie).toBe(false)
   })
 })

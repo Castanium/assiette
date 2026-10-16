@@ -22,8 +22,10 @@ Au premier lancement, l’app demande ton profil : sexe, âge, taille, poids act
 
 **Répartition** : deux repas principaux identiques se partagent 70, 75 (par défaut) ou 80 % de la journée ; le reste va aux collations, montrées à titre indicatif. Chaque repas principal reçoit au moins 0,4 g/kg de protéines, repère issu de la littérature sur la répartition des protéines par repas.
 
+**Collations** : elles comprennent 1 à 2 fruits (≈ 150 à 300 g). Un fruit de 150 g est déduit du budget collations, et l’app montre ce qui reste, avec trois idées qui incluent un fruit. Rien à saisir ni à suivre.
+
 **Assiette**
-- Les **légumes** non féculents (300 g par repas, au-dessus du minimum de 400 g de fruits et légumes par jour recommandé par l’OMS) sont retirés du budget en premier.
+- Les **légumes** non féculents (200 g par repas) sont retirés du budget en premier. Avec 1 à 2 fruits en collation, on atteint 550 à 700 g de fruits et légumes par jour, au-dessus du minimum de 400 g recommandé par l’OMS.
 - La quantité du plat est limitée par les glucides et les lipides (tolérance de 10 %, réglable). Les protéines ne sont pas une limite.
 - Les compléments viennent ensuite, dans l’ordre : protéine, féculent, matière grasse, en grammes arrondis à 5 g.
 - Le rythme de perte estimé vaut déficit × 7 / 7 700 kg par semaine.

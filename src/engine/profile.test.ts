@@ -24,6 +24,13 @@ describe('profil type', () => {
     expect(kcal(b.collations)).toBeCloseTo(542, 0)
     expect(b.collations.p).toBeCloseTo(36)
   })
+  it('collations : le fruit de 150 g est déduit du budget', () => {
+    expect(b.fruit).toEqual({ g: 18, p: expect.closeTo(1.05), l: expect.closeTo(0.45) })
+    expect(kcal(b.fruit)).toBeCloseTo(80.25)
+    expect(kcal(b.collationsApresFruit)).toBeCloseTo(kcal(b.collations) - 80.25)
+    expect(kcal(b.collationsApresFruit)).toBeCloseTo(462, 0)
+    expect(b.collationsApresFruit.p).toBeCloseTo(36 - 1.05)
+  })
   it('rythme de perte = déficit × 7 / 7700', () => {
     expect(b.perteParSemaine).toBeCloseTo(((b.depense - b.apport) * 7) / 7700)
     expect(b.perteParSemaine).toBeCloseTo(0.35, 2)

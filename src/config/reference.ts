@@ -28,9 +28,13 @@ export const KCAL_PAR_KG = 7700
 // ---- Assiette (engine/plate.ts) ----
 export const TOLERANCE = 0.1
 export const ECART_ASSIETTE = 0.25
-export const LEGUMES_G = 300
+export const LEGUMES_G = 200
 export const LEGUMES: Aliment = { id: 'legumes', nom: 'Légumes variés', categorie: 'legumes', pour100: { g: 4.5, p: 1.5, l: 0.3 } }
 // (≈ 2,5 g de fibres et 25 kcal pour 100 g)
+
+// ---- Collations : 1 à 2 fruits par jour ; un fruit de 150 g est déduit du budget ----
+export const FRUIT_POUR100: Macros = { g: 12, p: 0.7, l: 0.3 } // fruit moyen (≈ 2 g de fibres)
+export const FRUIT_G = 150
 
 const COMPLET = 'Choisis-le complet ou semi-complet si tu peux.'
 
@@ -58,9 +62,10 @@ export const COMPLEMENTS: Aliment[] = [
 
 export const PREFERES: Record<Cat, string> = { proteine: 'poulet', feculent: 'riz', gras: 'olive' }
 
-// Idées de collations, purement indicatives, par tranche de kcal restantes sur la journée.
+// Idées de collations, purement indicatives, par tranche de kcal restantes après le fruit.
+// Toutes incluent un fruit, ou se prennent avec.
 export const IDEES_COLLATIONS: { jusqua: number; idees: string[] }[] = [
-  { jusqua: 300, idees: ['Un yaourt grec nature et un fruit', 'Un fromage blanc et quelques fraises', 'Une pomme et une petite poignée d’amandes'] },
-  { jusqua: 550, idees: ['Un yaourt grec, un fruit et une poignée d’oléagineux', 'Un fromage blanc et des flocons d’avoine', 'Une tartine de pain complet et un œuf dur'] },
-  { jusqua: Infinity, idees: ['Un fromage blanc, des flocons d’avoine et un fruit', 'Un yaourt grec, une poignée d’oléagineux et une banane', 'Une tartine de pain complet, du houmous et des crudités'] },
+  { jusqua: 250, idees: ['Un yaourt grec nature et un fruit', 'Un fromage blanc et un fruit', 'Un fruit et une petite poignée d’amandes'] },
+  { jusqua: 450, idees: ['Un yaourt grec, un fruit et une poignée d’oléagineux', 'Un fromage blanc, des flocons d’avoine et un fruit', 'Un fruit, une tartine de pain complet et un œuf dur'] },
+  { jusqua: Infinity, idees: ['Un fromage blanc, des flocons d’avoine et un fruit', 'Un yaourt grec, une poignée d’oléagineux et une banane', 'Un fruit, une tartine de pain complet et du houmous'] },
 ]

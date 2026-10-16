@@ -217,7 +217,7 @@ function ecranResultat() {
       <span class="nom">Légumes non féculents<small>tels que servis, crus ou cuits</small></span>
       <span class="qte">${r.legumes.grammes} g</span>
     </div>`)
-  const notes = ['Pomme de terre, patate douce, maïs, petits pois et légumineuses comptent comme féculents, pas comme légumes. Tu peux rajouter des légumes si tu as encore faim.']
+  const notes = ['Avec 1 à 2 fruits en collation, tu atteins 550 à 700 g de fruits et légumes par jour.', 'Pomme de terre, patate douce, maïs, petits pois et légumineuses comptent comme féculents, pas comme légumes. Tu peux rajouter des légumes si tu as encore faim.']
   if (r.tresDense) notes.push('Ajoute des légumes en plus, autant que tu veux.')
   notes.push(...r.conseils)
   const fec = r.complements.find((c) => c.aliment.categorie === 'feculent')?.aliment.astuce
@@ -306,12 +306,13 @@ function carteAssiette(b: Besoins) {
 }
 
 function carteCollations(b: Besoins) {
-  const k = kcal(b.collations)
-  const idees = IDEES_COLLATIONS.find((t) => k <= t.jusqua)!.idees
+  const reste = kcal(b.collationsApresFruit)
+  const idees = IDEES_COLLATIONS.find((t) => reste <= t.jusqua)!.idees
   return `
     <section class="carte" id="carte-coll">
       <h3 class="groupe-titre">Tes collations</h3>
-      <p>≈ ${fr(k, 0)} kcal, dont ${fr(b.collations.p, 0)} g de protéines, en 1 ou 2 collations.</p>
+      <p>≈ ${fr(kcal(b.collations), 0)} kcal, dont ${fr(b.collations.p, 0)} g de protéines, en 1 ou 2 collations, dont 1 à 2 fruits (≈ 150 à 300 g).</p>
+      <p class="aide">Après un fruit de 150 g (≈ ${fr(kcal(b.fruit), 0)} kcal), il reste ≈ ${fr(reste, 0)} kcal, dont ${fr(b.collationsApresFruit.p, 0)} g de protéines.</p>
       <ul class="idees">${idees.map((i) => `<li>${i}</li>`).join('')}</ul>
     </section>`
 }
@@ -362,7 +363,7 @@ function ecranReglages() {
       <button type="button" class="btn-doux press" data-a="effacerProfil">Effacer mon profil</button>
     </section>
     <section class="carte">
-      <h3 class="groupe-titre">À propos</h3>
+      <h3 class="groupe-titre">À propos · v1.3</h3>
       <p class="aide">Assiette calcule tes besoins à partir de ton profil et t’aide à équilibrer chaque assiette. Tout reste dans ce navigateur : pas de compte, pas de cookie, aucune connexion. Valeurs des aliments d’après la table Ciqual de l’ANSES.</p>
       ${MENTION}
     </section>

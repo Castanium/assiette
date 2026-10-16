@@ -1,6 +1,6 @@
 // Besoins calculés à partir du profil. Fonctions pures.
 import {
-  COEF_ACTIVITE, DEFICIT, GLUCIDES_BAS_JOUR, KCAL_PAR_KG, LIPIDES_MIN, PLANCHER_PROTEINES_REPAS_GKG, type Macros,
+  COEF_ACTIVITE, DEFICIT, FRUIT_G, FRUIT_POUR100, GLUCIDES_BAS_JOUR, KCAL_PAR_KG, LIPIDES_MIN, PLANCHER_PROTEINES_REPAS_GKG, type Macros,
 } from '../config/reference'
 
 export type Sexe = 'homme' | 'femme'
@@ -48,6 +48,8 @@ export type Besoins = {
   jour: Macros
   repas: Macros
   collations: Macros
+  fruit: Macros // un fruit de 150 g
+  collationsApresFruit: Macros
   glucidesBas: boolean
   perteParSemaine: number
 }
@@ -66,6 +68,9 @@ export function besoins(p: Profil, r: ReglagesBesoins): Besoins {
 
   const repas = repasPrincipal(jour, r.partRepas, p.poidsVise)
   const collations = { g: Math.max(0, glu - 2 * repas.g), p: Math.max(0, prot - 2 * repas.p), l: Math.max(0, lip - 2 * repas.l) }
+  const k = FRUIT_G / 100
+  const fruit = { g: FRUIT_POUR100.g * k, p: FRUIT_POUR100.p * k, l: FRUIT_POUR100.l * k }
+  const collationsApresFruit = { g: Math.max(0, collations.g - fruit.g), p: Math.max(0, collations.p - fruit.p), l: Math.max(0, collations.l - fruit.l) }
 
   return {
     metabolisme,
@@ -76,6 +81,8 @@ export function besoins(p: Profil, r: ReglagesBesoins): Besoins {
     jour,
     repas,
     collations,
+    fruit,
+    collationsApresFruit,
     glucidesBas: glu < GLUCIDES_BAS_JOUR,
     perteParSemaine: ((depense - apport) * 7) / KCAL_PAR_KG,
   }
