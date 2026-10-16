@@ -27,7 +27,8 @@ Au premier lancement, l’app demande ton profil : sexe, âge, taille, poids act
 **Assiette**
 - Les **légumes** non féculents (200 g par repas) sont retirés du budget en premier. Avec 1 à 2 fruits en collation, on atteint 550 à 700 g de fruits et légumes par jour, au-dessus du minimum de 400 g recommandé par l’OMS.
 - La quantité du plat est limitée par les glucides et les lipides (tolérance de 10 %, réglable). Les protéines ne sont pas une limite.
-- Les compléments viennent ensuite, dans l’ordre : protéine, féculent, matière grasse, en grammes arrondis à 5 g.
+- Les compléments viennent ensuite, dans l’ordre : protéine, féculent, matière grasse, en grammes arrondis à 5 g. L’écran montre d’abord ce qui manque en macros (budget − plat − légumes), puis, pour chaque complément, la macro visée et l’aliment qui la couvre.
+- La quantité du plat est un **maximum**, pas une obligation. Le poids total de l’assiette et ses kcal sont affichés ; au-delà de 650 g, une note rappelle de s’arrêter quand on n’a plus faim, en allégeant d’abord le plat ou le féculent, jamais les protéines ni les légumes.
 - Le rythme de perte estimé vaut déficit × 7 / 7 700 kg par semaine.
 
 Valeurs des aliments d’après la table Ciqual de l’ANSES. Constantes de calcul et base d’aliments : `src/config/reference.ts`.

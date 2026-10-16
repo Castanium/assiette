@@ -195,34 +195,44 @@ function ecranResultat() {
       ? dep ? 'Un peu au-dessus du budget, rien de grave' : 'Il reste de la place pour compléter'
       : r.limitante ? `Limité par les ${NOM_MACRO[r.limitante]}` : ''
     verdict = `
-      <p class="chapeau">${s.imposer ? 'Tu manges' : 'Tu peux manger'}</p>
+      <p class="chapeau">${s.imposer ? 'Tu manges' : 'Tu peux manger jusqu’à'}</p>
       <p class="chiffre"><span>${fr(r.quantite, 0)} g</span></p>
       <p class="plat">${esc(deLiaison(s.aliment.nom))}</p>
       ${pill ? `<span class="limite">${pill}</span>` : ''}`
   }
+  // Chaque carte : la macro visée en petit, l'aliment et son poids en gros, ses autres apports en tout petit.
   const lignes = r.complements.map((c) => {
     const cat = c.aliment.categorie as Cat
-    const detail = cat === 'gras' && c.aliment.pour100.l >= 90 ? cuilleres(c.grammes) : c.aliment.astuce ? 'complet si possible' : ''
+    const vise = c.vise!
+    const aussi = MACROS.filter((k) => k !== vise.macro && c.apport[k] >= 1).map((k) => `${fr(c.apport[k], 0)} g de ${NOM_MACRO[k]}`)
+    const details = [
+      aussi.length ? `apporte aussi ${aussi.join(' et ')}` : '',
+      cat === 'gras' && c.aliment.pour100.l >= 90 ? cuilleres(c.grammes) : c.aliment.astuce ? 'complet si possible' : '',
+    ].filter(Boolean).join(' · ')
     return `
-      <div class="ligne">
+      <div class="ligne carte-compl">
         <span class="puce ${cat}" aria-hidden="true"></span>
-        <span class="nom">${esc(c.aliment.nom)}${detail ? `<small>${detail}</small>` : ''}</span>
-        <span class="qte">${fr(c.grammes, 0)} g</span>
+        <span class="nom">
+          <small class="vise">${majuscule(NOM_MACRO[vise.macro])} · +${fr(vise.grammes, 0)} g</small>
+          <span class="aliment">${fr(c.grammes, 0)} g ${esc(deLiaison(c.aliment.nom))}</span>
+          ${details ? `<small>${details}</small>` : ''}
+        </span>
         <button type="button" class="changer press" data-a="changer" data-v="${cat}" aria-label="Changer de ${NOM_CAT[cat].toLowerCase()}">${ICONE.changer}</button>
       </div>`
   })
   lignes.push(`
     <div class="ligne sans-bouton">
       <span class="puce legumes" aria-hidden="true"></span>
-      <span class="nom">Légumes non féculents<small>tels que servis, crus ou cuits</small></span>
-      <span class="qte">${r.legumes.grammes} g</span>
+      <span class="nom"><span class="aliment">${r.legumes.grammes} g de légumes</span><small>non féculents, tels que servis, crus ou cuits</small></span>
     </div>`)
+  const manque = (['p', 'g', 'l'] as const)
+    .map((k) => `<span class="manque ${k}${Math.round(r.manque[k]) === 0 ? ' zero' : ''}">${fr(r.manque[k], 0)} g de ${NOM_MACRO[k]}</span>`)
+    .join('<span aria-hidden="true">·</span>')
   const notes = ['Avec 1 à 2 fruits en collation, tu atteins 550 à 700 g de fruits et légumes par jour.', 'Pomme de terre, patate douce, maïs, petits pois et légumineuses comptent comme féculents, pas comme légumes. Tu peux rajouter des légumes si tu as encore faim.']
   if (r.tresDense) notes.push('Ajoute des légumes en plus, autant que tu veux.')
   notes.push(...r.conseils)
   const fec = r.complements.find((c) => c.aliment.categorie === 'feculent')?.aliment.astuce
   if (fec) notes.push(fec)
-  notes.push(`Environ ${fr(r.totalKcal, 0)} kcal pour l’assiette complète, à titre indicatif.`)
 
   return `
   <main class="ecran deux">
@@ -233,12 +243,15 @@ function ecranResultat() {
         <span class="pastille-repas">Mon assiette</span>
       </header>
       <section class="verdict" aria-live="polite">${verdict}</section>
+      <p class="aide poids">Assiette complète : ${fr(r.poidsTotal, 0)} g · ≈ ${fr(r.totalKcal, 0)} kcal</p>
+      ${r.copieuse ? '<p class="message info" role="status">Assiette copieuse : arrête-toi quand tu n’as plus faim, ce qui reste peut passer en collation. Pour l’alléger, réduis d’abord le plat ou le féculent, jamais les protéines ni les légumes.</p>' : ''}
       ${r.proteinesAuDessus ? '<p class="message bien">Protéines au-dessus de ta cible, parfait pour tes muscles.</p>' : ''}
       ${r.verifierSaisie ? message('Ce total s’éloigne nettement de ton assiette type. Vérifie tes valeurs : sont-elles bien pour la quantité indiquée, et pas pour toute la portion ?', 'info') : ''}
       ${jauges(r)}
     </div>
     <div class="col">
-      <p class="sous-titre o1">À compléter avec</p>
+      <p class="sous-titre o1">Pour atteindre ta cible</p>
+      <p class="manques o1">Il te manque : ${manque}</p>
       <div class="liste o1">${lignes.join('')}</div>
       ${notes.map((n) => `<p class="note o1">${esc(n)}</p>`).join('')}
       <div class="o1">${carteCollations(calculBesoins())}</div>
@@ -363,7 +376,7 @@ function ecranReglages() {
       <button type="button" class="btn-doux press" data-a="effacerProfil">Effacer mon profil</button>
     </section>
     <section class="carte">
-      <h3 class="groupe-titre">À propos · v1.3</h3>
+      <h3 class="groupe-titre">À propos · v1.4</h3>
       <p class="aide">Assiette calcule tes besoins à partir de ton profil et t’aide à équilibrer chaque assiette. Tout reste dans ce navigateur : pas de compte, pas de cookie, aucune connexion. Valeurs des aliments d’après la table Ciqual de l’ANSES.</p>
       ${MENTION}
     </section>

@@ -225,7 +225,17 @@ p { margin: 0; }
 .puce.legumes { background: var(--c-g); }
 .ligne .nom { flex: 1; font-size: 17px; font-weight: 700; min-width: 0; }
 .ligne .nom small { display: block; font-size: 13px; font-weight: 600; color: var(--texte2); }
-.ligne .qte { font-size: 19px; font-weight: 800; white-space: nowrap; }
+.ligne .aliment { display: block; font-size: 19px; font-weight: 800; overflow-wrap: anywhere; }
+.carte-compl { border-radius: 32px; padding-top: 10px; padding-bottom: 10px; }
+.ligne .nom small.vise { font-size: 13px; font-weight: 800; color: var(--texte2); }
+.poids { padding: 0 8px; font-weight: 700; }
+.manques { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--texte2); }
+.manque { min-height: 28px; padding: 3px 10px; border-radius: 999px; display: inline-flex; align-items: center; font-weight: 800; }
+.manque.g { background: var(--c-g); color: #2A1F3D; }
+.manque.p { background: var(--c-p); color: #FFFFFF; }
+.manque.l { background: var(--c-l); color: #FFFFFF; }
+@media (prefers-color-scheme: dark) { .manque.l { color: #17121F; } }
+.manque.zero { background: var(--piste); color: var(--texte2); }
 .changer {
   width: 52px; height: 52px; border: 0; border-radius: 999px; flex: none;
   background: var(--lavande); color: var(--action); display: flex; align-items: center; justify-content: center; cursor: pointer;

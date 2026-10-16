@@ -28,6 +28,7 @@ export const KCAL_PAR_KG = 7700
 // ---- Assiette (engine/plate.ts) ----
 export const TOLERANCE = 0.1
 export const ECART_ASSIETTE = 0.25
+export const ASSIETTE_COPIEUSE_G = 650 // au-delà : note « assiette copieuse »
 export const LEGUMES_G = 200
 export const LEGUMES: Aliment = { id: 'legumes', nom: 'Légumes variés', categorie: 'legumes', pour100: { g: 4.5, p: 1.5, l: 0.3 } }
 // (≈ 2,5 g de fibres et 25 kcal pour 100 g)

@@ -104,3 +104,44 @@ describe('calcul et saisie', () => {
     expect(equilibrer(entree(gyozas, { quantiteImposee: 330 })).verifierSaisie).toBe(false)
   })
 })
+
+describe('assiette copieuse et poids total', () => {
+  it('plus de 650 g : note copieuse, poids total = plat + compléments + légumes', () => {
+    const soupe: Macros = { g: 10, p: 3, l: 2 } // peu dense : 860 g de plat
+    const r = equilibrer(entree(soupe))
+    expect(r.quantite).toBe(860)
+    expect(grammes(r, 'proteine')).toBe(85)
+    expect(grammes(r, 'gras')).toBe(5)
+    expect(r.poidsTotal).toBe(860 + 85 + 5 + 200)
+    expect(r.copieuse).toBe(true)
+  })
+  it('gyozas : 330 + 95 + 200 = 625 g, pas copieuse', () => {
+    const r = equilibrer(entree(gyozas))
+    expect(r.poidsTotal).toBe(625)
+    expect(r.copieuse).toBe(false)
+  })
+})
+
+describe('macros manquantes', () => {
+  it('égales au budget moins le plat et les légumes', () => {
+    const r = equilibrer(entree(gyozas))
+    for (const k of ['g', 'p', 'l'] as const)
+      expect(r.manque[k]).toBeCloseTo(Math.max(0, budget[k] - r.plat[k] - r.legumes.apport[k]))
+    expect(r.manque.p).toBeCloseTo(27.9)
+    expect(r.manque.l).toBeCloseTo(3.6)
+  })
+  it('cohérentes avec les compléments proposés', () => {
+    const r = equilibrer(entree({ g: 10, p: 3, l: 2 }))
+    const [prot, gras] = r.complements
+    // la protéine vise tout le manque de protéines et le couvre à l'arrondi de 5 g près
+    expect(prot.vise).toEqual({ macro: 'p', grammes: expect.closeTo(r.manque.p) })
+    expect(Math.abs(prot.apport.p - r.manque.p)).toBeLessThanOrEqual(2.5 * 0.29)
+    // la matière grasse vise le manque de lipides moins ce que la protéine apporte déjà
+    expect(gras.vise).toEqual({ macro: 'l', grammes: expect.closeTo(r.manque.l - prot.apport.l) })
+  })
+  it('jamais négatives en cas de dépassement', () => {
+    const r = equilibrer(entree(gyozas, { quantiteImposee: 400 }))
+    expect(r.manque.g).toBe(0)
+    expect(r.depassement.g).toBeGreaterThan(0)
+  })
+})

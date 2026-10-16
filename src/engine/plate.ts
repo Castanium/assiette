@@ -1,5 +1,5 @@
 // Moteur pur : aucune dépendance au DOM ni au stockage.
-import { ECART_ASSIETTE, LEGUMES_G, type Aliment, type Macros } from '../config/reference'
+import { ASSIETTE_COPIEUSE_G, ECART_ASSIETTE, LEGUMES_G, type Aliment, type Macros } from '../config/reference'
 import { kcal } from './profile'
 
 export const MACROS = ['g', 'p', 'l'] as const
@@ -27,7 +27,7 @@ export function normaliser(quantiteRef: number, m: Macros): { pour100?: Macros; 
   return { pour100 }
 }
 
-export type Ligne = { aliment: Aliment; grammes: number; apport: Macros }
+export type Ligne = { aliment: Aliment; grammes: number; apport: Macros; vise?: { macro: Macro; grammes: number } }
 
 export type Resultat = {
   quantite: number
@@ -37,12 +37,15 @@ export type Resultat = {
   legumes: Ligne
   budget: Macros // budget du repas, légumes compris
   depassement: Macros // > 0 sur les macros dépassées
+  manque: Macros // budget − plat − légumes, ramené à 0
   conseils: string[]
   proteinesAuDessus: boolean
   tresDense: boolean
   total: Macros
   totalKcal: number
   verifierSaisie: boolean
+  poidsTotal: number // plat + compléments + légumes, en g
+  copieuse: boolean
 }
 
 export type Entree = {
@@ -92,7 +95,7 @@ export function equilibrer(e: Entree): Resultat {
     if (parG <= 0 || cible <= 0) return
     const grammes = round5(cible / parG)
     if (grammes < (estHuile(al) ? 3 : 10) && !(force && grammes > 0)) return
-    const l = { aliment: al, grammes, apport: scale(al.pour100, grammes / 100) }
+    const l = { aliment: al, grammes, apport: scale(al.pour100, grammes / 100), vise: { macro, grammes: cible } }
     complements.push(l)
     return l
   }
@@ -116,6 +119,7 @@ export function equilibrer(e: Entree): Resultat {
 
   const total = [...complements, legumes].reduce((s, c) => add(s, c.apport), plat)
   const totalKcal = Math.round(kcal(total))
+  const poidsTotal = quantite + LEGUMES_G + complements.reduce((s, c) => s + c.grammes, 0)
   const proteinesAuDessus = total.p > e.budget.p + 5
 
   const conseils: string[] = []
@@ -131,12 +135,15 @@ export function equilibrer(e: Entree): Resultat {
     legumes,
     budget: e.budget,
     depassement,
+    manque: { g: Math.max(0, brut.g), p: Math.max(0, brut.p), l: Math.max(0, brut.l) },
     conseils,
     proteinesAuDessus,
     tresDense: e.quantiteImposee == null && quantite < 50,
     total,
     totalKcal,
     verifierSaisie: Math.abs(totalKcal - kcal(e.budget)) / kcal(e.budget) > ECART_ASSIETTE,
+    poidsTotal,
+    copieuse: poidsTotal > ASSIETTE_COPIEUSE_G,
   }
 }
 
