@@ -1,50 +1,73 @@
 import { describe, expect, it } from 'vitest'
-import { PORTIONS } from '../config/reference'
-import { budgetRepas } from './plate'
-import { ecart, estimer, mifflin, verifierProfil, type Profil } from './profile'
+import { besoins, kcal, mifflin, repasPrincipal, verifierProfil, type Profil, type ReglagesBesoins } from './profile'
 
-const homme: Profil = { poids: 80, poidsVise: 75, taille: 180, age: 30, sexe: 'homme', activite: 'modere' }
-const femme: Profil = { poids: 65, poidsVise: 60, taille: 165, age: 40, sexe: 'femme', activite: 'sedentaire' }
+const homme: Profil = { sexe: 'homme', age: 35, taille: 180, poids: 90, poidsVise: 80, activite: 'leger' }
+const reglages: ReglagesBesoins = { deficit: 0.15, proteinesGkg: 1.8, partRepas: 0.75 }
 
-describe('profil', () => {
-  it('Mifflin-St Jeor', () => {
-    expect(mifflin(homme)).toBe(1780)
-    expect(mifflin(femme)).toBeCloseTo(1320.25)
+describe('profil type', () => {
+  const b = besoins(homme, reglages)
+  it('métabolisme, dépense, apport', () => {
+    expect(b.metabolisme).toBe(1855)
+    expect(b.depense).toBeCloseTo(2550.6, 1)
+    expect(b.apport).toBeCloseTo(2168, 0)
   })
-  it('plafond de déficit à 500 kcal', () => {
-    const e = estimer({ ...homme, activite: 'actif' }) // dépense 3070,5 → 15 % = 460
-    expect(e.depense - e.apport).toBeCloseTo(460.6, 0)
-    const gros = estimer({ ...homme, poids: 140, poidsVise: 100, activite: 'actif' })
-    expect(gros.depense - gros.apport).toBe(500)
-    expect(gros.perteParSemaine).toBeLessThanOrEqual(1)
+  it('macros du jour', () => {
+    expect(b.jour.p).toBeCloseTo(144)
+    expect(b.jour.l).toBeCloseTo(64) // 0,8 × 80 > 25 % de 2168 / 9 = 60,2
+    expect(b.jour.g).toBeCloseTo(254, 0)
   })
-  it('plancher calorique : jamais sous le métabolisme ni sous 1200 / 1500', () => {
-    const petite: Profil = { poids: 50, poidsVise: 48, taille: 155, age: 70, sexe: 'femme', activite: 'sedentaire' }
-    const e = estimer(petite)
-    expect(e.apport).toBeGreaterThanOrEqual(1200)
-    expect(e.apport).toBeGreaterThanOrEqual(e.metabolisme)
-    const h = estimer({ ...petite, sexe: 'homme', poids: 55, poidsVise: 52, taille: 160 })
-    expect(h.apport).toBeGreaterThanOrEqual(1500)
+  it('repas principal à 37,5 % et collations à 25 %', () => {
+    expect(b.repas.p).toBeCloseTo(54)
+    expect(b.repas.l).toBeCloseTo(24)
+    expect(b.repas.g).toBeCloseTo(95.3, 0)
+    expect(kcal(b.repas)).toBeCloseTo(813, 0)
+    expect(kcal(b.collations)).toBeCloseTo(542, 0)
+    expect(b.collations.p).toBeCloseTo(36)
   })
-  it('maintien si poids visé égal', () => {
-    const e = estimer({ ...femme, poidsVise: 65 })
-    expect(e.apport).toBe(e.depense)
-    expect(e.perteParSemaine).toBe(0)
+  it('rythme de perte = déficit × 7 / 7700', () => {
+    expect(b.perteParSemaine).toBeCloseTo(((b.depense - b.apport) * 7) / 7700)
+    expect(b.perteParSemaine).toBeCloseTo(0.35, 2)
   })
-  it('refus d’un poids visé sous IMC 18,5', () => {
-    expect(verifierProfil({ ...femme, poidsVise: 48 })).toBeDefined() // IMC 17,6
-    expect(verifierProfil(femme)).toBeUndefined()
-    expect(verifierProfil({ ...femme, age: 15 })).toBeDefined()
+})
+
+describe('garde-fous des besoins', () => {
+  it('déficit plafonné à 750 kcal', () => {
+    const grand: Profil = { sexe: 'homme', age: 30, taille: 190, poids: 130, poidsVise: 100, activite: 'actif' }
+    const b = besoins(grand, { ...reglages, deficit: 0.25 })
+    expect(b.depense - b.apport).toBeCloseTo(750)
   })
-  it('répartition par repas 35 % / 30 %', () => {
-    const e = estimer(homme)
-    expect(e.repas.dejeuner.p).toBeCloseTo(e.jour.p * 0.35)
-    expect(e.repas.diner.l).toBeCloseTo(e.jour.l * 0.3)
-    expect(e.jour.p).toBeCloseTo(105) // 1,4 × 75
+  it('apport jamais sous le métabolisme de base', () => {
+    const b = besoins({ ...homme, activite: 'sedentaire' }, { ...reglages, deficit: 0.25 }) // 1,2 × 0,75 < 1
+    expect(b.apport).toBe(b.metabolisme)
   })
-  it('écart avec les portions de référence', () => {
-    const ref = budgetRepas(PORTIONS, 'dejeuner', false)
-    expect(ecart(ref, ref)).toBe(0)
-    expect(ecart(ref, { g: 60, p: 24, l: 16 })).toBeGreaterThan(0.2)
+  it('maintien si le poids visé est atteint : déficit bloqué à 0', () => {
+    const b = besoins({ ...homme, poidsVise: 90 }, reglages)
+    expect(b.maintien).toBe(true)
+    expect(b.deficitApplique).toBe(0)
+    expect(b.apport).toBe(b.depense)
+    expect(b.perteParSemaine).toBe(0)
+  })
+  it('plancher de 0,4 g/kg de protéines par repas principal', () => {
+    // Inatteignable avec les réglages proposés (1,2 × 35 % = 0,42 g/kg) : testé directement.
+    const jour = { g: 150, p: 1.2 * 50, l: 50 }
+    const m = repasPrincipal(jour, 0.6, 50)
+    expect(m.p).toBeCloseTo(20) // 0,4 × 50, au lieu de 18
+    expect(m.g).toBeCloseTo(45 - 2) // 2 g de glucides retirés
+    const petit = besoins({ sexe: 'femme', age: 30, taille: 150, poids: 50, poidsVise: 45, activite: 'sedentaire' }, { deficit: 0.15, proteinesGkg: 1.2, partRepas: 0.7 })
+    expect(petit.repas.p).toBeGreaterThanOrEqual(0.4 * 45)
+  })
+  it('avertissement quand les glucides tombent sous 100 g par jour', () => {
+    const p: Profil = { sexe: 'femme', age: 50, taille: 165, poids: 100, poidsVise: 85, activite: 'sedentaire' }
+    expect(besoins(p, { deficit: 0.25, proteinesGkg: 2.2, partRepas: 0.75 }).glucidesBas).toBe(true)
+    expect(besoins(homme, reglages).glucidesBas).toBe(false)
+  })
+  it('refus d’un poids visé sous IMC 18,5 et valeurs implausibles', () => {
+    expect(verifierProfil({ ...homme, poidsVise: 58 })).toBeDefined() // IMC 17,9
+    expect(verifierProfil(homme)).toBeUndefined()
+    expect(verifierProfil({ ...homme, age: 15 })).toBeDefined()
+    expect(verifierProfil({ ...homme, taille: 230 })).toBeDefined()
+  })
+  it('Mifflin-St Jeor femme', () => {
+    expect(mifflin({ sexe: 'femme', poids: 65, taille: 165, age: 40 })).toBeCloseTo(1320.25)
   })
 })

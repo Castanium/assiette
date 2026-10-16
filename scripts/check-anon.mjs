@@ -19,7 +19,8 @@ const session = userInfo().username.toLowerCase()
 
 const IMAGES_GENEREES = new Set(['src/assets/logo.svg', 'public/favicon.svg', 'public/icons/icon-180.png', 'public/icons/icon-192.png', 'public/icons/icon-512.png'])
 const BINAIRE = /\.(png|jpe?g|gif|webp|avif|heic|bmp|ico|tiff?|pdf|docx?|xlsx?|pptx?|odt|zip)$/i
-const URL_OK = [/^https:\/\/world\.openfoodfacts\.org(\/|$)/, /^https?:\/\/www\.w3\.org\//]
+// Aucune URL externe : seuls les identifiants d'espace de noms XML (SVG), jamais chargés, sont tolérés.
+const URL_OK = [/^https?:\/\/www\.w3\.org\/(2000\/svg|1999\/xlink)$/]
 const RESEAU = /\b(fetch\s*\(|XMLHttpRequest|WebSocket|EventSource|sendBeacon|navigator\.connection)/
 const CHEMIN = /([a-z]:[\\/]+(users|documents and settings)[\\/])|(\/users\/[^/\s'"`]+)|(\/home\/[a-z_][^/\s'"`]*)/i
 
@@ -63,8 +64,8 @@ for (const f of [...fichiers, ...build]) {
     for (const u of txt.match(/https?:\/\/[^\s'"`)<>\];]+/g) ?? [])
       if (!URL_OK.some((r) => r.test(u))) faute(f, `URL externe ${u}`)
 
-  if (!dansBuild && /\.(m?[jt]s)$/.test(f) && !f.startsWith('src/scan/') && !f.startsWith('scripts/') && f !== 'vite.config.ts' && RESEAU.test(txt))
-    faute(f, 'appel réseau en dehors du module de scan')
+  // L'app ne fait aucune requête réseau : ni dans le code source, ni dans le build.
+  if (!soiMeme && (dansBuild || /\.(m?[jt]s)$/.test(f)) && RESEAU.test(txt)) faute(f, `appel réseau (${txt.match(RESEAU)[0]})`)
   if (dansBuild && f.endsWith('.map')) faute(f, 'sourcemap dans le build')
 }
 

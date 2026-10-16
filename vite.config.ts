@@ -3,7 +3,6 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import { viteSingleFile } from 'vite-plugin-singlefile'
 
-const OFF = 'https://world.openfoodfacts.org'
 
 // Ajoute la CSP après l'inlining : hash sha256 de chaque <script> et <style> inline, sans unsafe-inline.
 function csp(): Plugin {
@@ -26,9 +25,8 @@ function csp(): Plugin {
         `script-src ${hashes('script')}`,
         `style-src ${hashes('style')}`,
         "font-src 'self' data:",
-        "img-src 'self' data: blob:",
-        "media-src 'self' blob: mediastream:",
-        `connect-src 'self' ${OFF}`,
+        "img-src 'self' data:",
+        "connect-src 'none'",
         "manifest-src 'self'",
         "object-src 'none'",
         "base-uri 'none'",
@@ -42,6 +40,6 @@ function csp(): Plugin {
 
 export default defineConfig({
   base: process.env.BASE ?? './',
-  build: { sourcemap: false, assetsInlineLimit: 100_000_000 },
+  build: { sourcemap: false, assetsInlineLimit: 100_000_000, modulePreload: { polyfill: false } },
   plugins: [viteSingleFile(), csp()],
 })

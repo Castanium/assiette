@@ -1,24 +1,18 @@
 // Moteur pur : aucune dépendance au DOM ni au stockage.
-import { LEGUMES_G, type Aliment, type Macros, type Portions, type Repas } from '../config/reference'
+import { ECART_ASSIETTE, LEGUMES_G, type Aliment, type Macros } from '../config/reference'
+import { kcal } from './profile'
 
 export const MACROS = ['g', 'p', 'l'] as const
 export type Macro = (typeof MACROS)[number]
 export const NOM_MACRO: Record<Macro, string> = { g: 'glucides', p: 'protéines', l: 'lipides' }
 
-export const kcal = (m: Macros) => m.g * 4 + m.p * 4 + m.l * 9
 const add = (a: Macros, b: Macros): Macros => ({ g: a.g + b.g, p: a.p + b.p, l: a.l + b.l })
+const sub = (a: Macros, b: Macros): Macros => ({ g: a.g - b.g, p: a.p - b.p, l: a.l - b.l })
 const scale = (m: Macros, k: number): Macros => ({ g: m.g * k, p: m.p * k, l: m.l * k })
-const ZERO: Macros = { g: 0, p: 0, l: 0 }
 const round5 = (x: number) => Math.round(x / 5) * 5
 
 /** Accepte la virgule ; NaN si vide ou invalide. */
 export const nombre = (s: string) => (s.trim() === '' ? NaN : Number(s.trim().replace(',', '.')))
-
-export function budgetRepas(portions: Portions, repas: Repas, fromagePain: boolean): Macros {
-  let b = add(add(portions.proteines, portions.feculents), portions.gras[repas])
-  if (fromagePain) b = add(add(b, portions.fromage), portions.pain)
-  return b
-}
 
 /** Ramène des valeurs « pour X g » à 100 g et vérifie leur cohérence. */
 export function normaliser(quantiteRef: number, m: Macros): { pour100?: Macros; erreur?: string } {
@@ -33,24 +27,6 @@ export function normaliser(quantiteRef: number, m: Macros): { pour100?: Macros; 
   return { pour100 }
 }
 
-export type Qualite = { sucres?: number; sel?: number; satures?: number; fibres?: number; nutriscore?: string; nova?: number }
-export type Pastille = { texte: string; ton: 'alerte' | 'bien' | 'info' }
-
-export function pastilles(q: Qualite = {}): { pastilles: Pastille[]; conseil?: string } {
-  const out: Pastille[] = []
-  if (q.sucres != null && q.sucres > 22.5) out.push({ texte: 'Très sucré', ton: 'alerte' })
-  if (q.sel != null && q.sel > 1.5) out.push({ texte: 'Très salé', ton: 'alerte' })
-  if (q.satures != null && q.satures > 5) out.push({ texte: 'Riche en graisses saturées', ton: 'alerte' })
-  if (q.fibres != null && q.fibres > 6) out.push({ texte: 'Riche en fibres', ton: 'bien' })
-  if (q.nutriscore && /^[a-e]$/i.test(q.nutriscore)) out.push({ texte: `Nutri-Score ${q.nutriscore.toUpperCase()}`, ton: 'info' })
-  if (q.nova && q.nova >= 1 && q.nova <= 4) out.push({ texte: `NOVA ${q.nova}`, ton: 'info' })
-  const conseil =
-    q.sucres != null && q.sucres > 22.5
-      ? 'Le budget féculents n’est pas fait pour les produits sucrés : celui-ci, on le garde pour les fois occasionnelles.'
-      : undefined
-  return { pastilles: out, conseil }
-}
-
 export type Ligne = { aliment: Aliment; grammes: number; apport: Macros }
 
 export type Resultat = {
@@ -59,9 +35,10 @@ export type Resultat = {
   plat: Macros
   complements: Ligne[]
   legumes: Ligne
-  budget: Macros
+  budget: Macros // budget du repas, légumes compris
   depassement: Macros // > 0 sur les macros dépassées
   conseils: string[]
+  proteinesAuDessus: boolean
   tresDense: boolean
   total: Macros
   totalKcal: number
@@ -72,69 +49,79 @@ export type Entree = {
   budget: Macros
   pour100: Macros
   tolerance: number
-  complements: { proteine: Aliment; feculent: Aliment; gras: Aliment; legumes: Aliment }
+  complements: { proteine: Aliment; feculent: Aliment; gras: Aliment }
+  legumes: Aliment
   quantiteImposee?: number
 }
 
-const SEUIL_HUILE = 3
-const SEUIL = 10
 const estHuile = (a: Aliment) => a.pour100.l >= 90
 
 export function equilibrer(e: Entree): Resultat {
   const a = scale(e.pour100, 1 / 100) // par gramme
   if (MACROS.every((k) => a[k] <= 0)) throw new Error('Aliment sans glucides, protéines ni lipides.')
 
+  // Les légumes comptent : on retire leurs macros du budget avant tout le reste.
+  const legumes: Ligne = { aliment: e.legumes, grammes: LEGUMES_G, apport: scale(e.legumes.pour100, LEGUMES_G / 100) }
+  const dispo = sub(e.budget, legumes.apport)
+
+  // Quantité maximale : seuls glucides et lipides limitent (les protéines ne sont pas une limite haute).
+  // Un plat sans glucides ni lipides est limité par les protéines, faute d'autre repère.
   let quantite: number
   let limitante: Macro | undefined
   if (e.quantiteImposee != null) {
     quantite = e.quantiteImposee
   } else {
+    const limites: Macro[] = a.g > 0 || a.l > 0 ? ['g', 'l'] : ['p']
     let min = Infinity
-    for (const k of MACROS) {
+    for (const k of limites) {
       if (a[k] <= 0) continue
-      const q = (e.budget[k] * (1 + e.tolerance)) / a[k]
+      const q = (Math.max(0, dispo[k]) * (1 + e.tolerance)) / a[k]
       if (q < min) [min, limitante] = [q, k]
     }
     quantite = Math.max(0, Math.floor(min / 5) * 5)
   }
 
   const plat = scale(a, quantite)
-  const brut = { g: e.budget.g - plat.g, p: e.budget.p - plat.p, l: e.budget.l - plat.l }
-  const depassement = { g: Math.max(0, -brut.g), p: Math.max(0, -brut.p), l: Math.max(0, -brut.l) }
-  const reste = { g: Math.max(0, brut.g), p: Math.max(0, brut.p), l: Math.max(0, brut.l) }
+  const brut = sub(dispo, plat)
+  const depassement = { g: Math.max(0, -brut.g), p: 0, l: Math.max(0, -brut.l) }
+  const reste = { g: Math.max(0, brut.g), p: brut.p, l: Math.max(0, brut.l) }
 
   const complements: Ligne[] = []
-  const ajouter = (al: Aliment, macro: Macro, force = false) => {
+  const ligne = (al: Aliment, cible: number, macro: Macro, force = false) => {
     const parG = al.pour100[macro] / 100
-    if (parG <= 0 || reste[macro] <= 0) return
-    const grammes = round5(reste[macro] / parG)
-    const seuil = estHuile(al) ? SEUIL_HUILE : SEUIL
-    if (grammes < seuil && !(force && grammes > 0)) return
-    const apport = scale(al.pour100, grammes / 100)
-    for (const k of MACROS) reste[k] = Math.max(0, reste[k] - apport[k])
-    complements.push({ aliment: al, grammes, apport })
-  }
-  // Une assiette garde toujours une source de protéines.
-  const platPauvreEnProteines = plat.p < e.budget.p / 2
-  ajouter(e.complements.proteine, 'p', platPauvreEnProteines)
-  ajouter(e.complements.feculent, 'g')
-  ajouter(e.complements.gras, 'l')
-
-  const legumes: Ligne = {
-    aliment: e.complements.legumes,
-    grammes: LEGUMES_G,
-    apport: scale(e.complements.legumes.pour100, LEGUMES_G / 100),
+    if (parG <= 0 || cible <= 0) return
+    const grammes = round5(cible / parG)
+    if (grammes < (estHuile(al) ? 3 : 10) && !(force && grammes > 0)) return
+    const l = { aliment: al, grammes, apport: scale(al.pour100, grammes / 100) }
+    complements.push(l)
+    return l
   }
 
-  const conseils: string[] = []
-  if (depassement.g > 0.5) conseils.push('Pas de féculents en plus à ce repas, ton assiette est déjà bien remplie.')
-  if (depassement.p > 0.5) conseils.push('Pas besoin de protéines en plus à ce repas.')
-  if (depassement.l > 0.5) conseils.push('Pas de matière grasse ajoutée cette fois, le plat en apporte déjà.')
-  if (!complements.some((c) => c.aliment.categorie === 'feculent') && !depassement.g && plat.g > 0)
-    conseils.push('Pas de féculents en plus, le plat a déjà tout pris.')
+  // 1. Protéine : toujours proposée si le plat couvre moins de la moitié du budget.
+  const prot = ligne(e.complements.proteine, reste.p, 'p', plat.p < e.budget.p / 2)
+  if (prot) {
+    reste.p -= prot.apport.p
+    reste.g = Math.max(0, reste.g - prot.apport.g)
+    reste.l = Math.max(0, reste.l - prot.apport.l)
+  }
+  // 2. Si les protéines dépassent le budget, leurs kcal en trop sont retirées du féculent, puis de la matière grasse.
+  let dette = Math.max(0, -reste.p) * 4
+  const cibleG = Math.max(0, reste.g - dette / 4)
+  dette = Math.max(0, dette - reste.g * 4)
+  let cibleL = Math.max(0, reste.l - dette / 9)
+  // 3. Féculent, puis 4. matière grasse, en tenant compte de ce qui est déjà apporté.
+  const fec = ligne(e.complements.feculent, cibleG, 'g')
+  if (fec) cibleL = Math.max(0, cibleL - fec.apport.l)
+  ligne(e.complements.gras, cibleL, 'l')
 
   const total = [...complements, legumes].reduce((s, c) => add(s, c.apport), plat)
   const totalKcal = Math.round(kcal(total))
+  const proteinesAuDessus = total.p > e.budget.p + 5
+
+  const conseils: string[] = []
+  if (depassement.g > 0.5) conseils.push('Pas de féculents en plus à ce repas, ton assiette est déjà bien remplie.')
+  if (depassement.l > 0.5) conseils.push('Pas de matière grasse ajoutée cette fois, le plat en apporte déjà.')
+  if (!fec && !depassement.g && plat.g > 0 && dispo.g - plat.g < 5) conseils.push('Pas de féculents en plus, le plat a déjà tout pris.')
 
   return {
     quantite,
@@ -145,10 +132,11 @@ export function equilibrer(e: Entree): Resultat {
     budget: e.budget,
     depassement,
     conseils,
+    proteinesAuDessus,
     tresDense: e.quantiteImposee == null && quantite < 50,
     total,
     totalKcal,
-    verifierSaisie: totalKcal < 350 || totalKcal > 750,
+    verifierSaisie: Math.abs(totalKcal - kcal(e.budget)) / kcal(e.budget) > ECART_ASSIETTE,
   }
 }
 
