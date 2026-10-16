@@ -89,33 +89,30 @@ export function equilibrer(e: Entree): Resultat {
   const depassement = { g: Math.max(0, -brut.g), p: 0, l: Math.max(0, -brut.l) }
   const reste = { g: Math.max(0, brut.g), p: brut.p, l: Math.max(0, brut.l) }
 
-  const complements: Ligne[] = []
-  const ligne = (al: Aliment, cible: number, macro: Macro, force = false) => {
+  const ligne = (al: Aliment, cible: number, macro: Macro, force = false): Ligne | undefined => {
     const parG = al.pour100[macro] / 100
     if (parG <= 0 || cible <= 0) return
     const grammes = round5(cible / parG)
     if (grammes < (estHuile(al) ? 3 : 10) && !(force && grammes > 0)) return
-    const l = { aliment: al, grammes, apport: scale(al.pour100, grammes / 100), vise: { macro, grammes: cible } }
-    complements.push(l)
-    return l
+    return { aliment: al, grammes, apport: scale(al.pour100, grammes / 100), vise: { macro, grammes: cible } }
   }
 
+  // Chaque complément vise ce qui reste une fois déduits le plat, les légumes et les compléments précédents.
   // 1. Protéine : toujours proposée si le plat couvre moins de la moitié du budget.
-  const prot = ligne(e.complements.proteine, reste.p, 'p', plat.p < e.budget.p / 2)
-  if (prot) {
-    reste.p -= prot.apport.p
-    reste.g = Math.max(0, reste.g - prot.apport.g)
-    reste.l = Math.max(0, reste.l - prot.apport.l)
-  }
+  const forcer = plat.p < e.budget.p / 2
+  let prot = ligne(e.complements.proteine, reste.p, 'p', forcer)
   // 2. Si les protéines dépassent le budget, leurs kcal en trop sont retirées du féculent, puis de la matière grasse.
-  let dette = Math.max(0, -reste.p) * 4
-  const cibleG = Math.max(0, reste.g - dette / 4)
-  dette = Math.max(0, dette - reste.g * 4)
-  let cibleL = Math.max(0, reste.l - dette / 9)
-  // 3. Féculent, puis 4. matière grasse, en tenant compte de ce qui est déjà apporté.
+  let dette = Math.max(0, (prot?.apport.p ?? 0) - reste.p) * 4
+  const resteG = Math.max(0, reste.g - (prot?.apport.g ?? 0))
+  const cibleG = Math.max(0, resteG - dette / 4)
+  dette = Math.max(0, dette - resteG * 4)
+  // 3. Féculent ; ses protéines sont retirées de la protéine, recalculée.
   const fec = ligne(e.complements.feculent, cibleG, 'g')
-  if (fec) cibleL = Math.max(0, cibleL - fec.apport.l)
-  ligne(e.complements.gras, cibleL, 'l')
+  if (prot && fec) prot = ligne(e.complements.proteine, reste.p - fec.apport.p, 'p', forcer)
+  // 4. Matière grasse, pour les lipides restants.
+  const cibleL = Math.max(0, reste.l - (prot?.apport.l ?? 0) - (fec?.apport.l ?? 0) - dette / 9)
+  const gras = ligne(e.complements.gras, cibleL, 'l')
+  const complements = [prot, fec, gras].filter((c): c is Ligne => !!c)
 
   const total = [...complements, legumes].reduce((s, c) => add(s, c.apport), plat)
   const totalKcal = Math.round(kcal(total))
@@ -126,6 +123,8 @@ export function equilibrer(e: Entree): Resultat {
   if (depassement.g > 0.5) conseils.push('Pas de féculents en plus à ce repas, ton assiette est déjà bien remplie.')
   if (depassement.l > 0.5) conseils.push('Pas de matière grasse ajoutée cette fois, le plat en apporte déjà.')
   if (!fec && !depassement.g && plat.g > 0 && dispo.g - plat.g < 5) conseils.push('Pas de féculents en plus, le plat a déjà tout pris.')
+  if (depassement.l <= 0.5 && total.l > e.budget.l + 5)
+    conseils.push('Les compléments apportent un peu plus de lipides que prévu : une protéine plus maigre allège l’assiette.')
 
   return {
     quantite,

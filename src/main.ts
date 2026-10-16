@@ -1,10 +1,10 @@
 import './styles.css'
 import logoSvg from './assets/logo.svg?raw'
 import {
-  COMPLEMENTS, DEFICIT, IDEES_COLLATIONS, LEGUMES, PARTS_REPAS, PROTEINES_GKG, type Cat, type Macros,
+  COMPLEMENTS, DEFICIT, IDEES_COLLATIONS, LEGUMES, OBJECTIFS, PARTS_REPAS, PROTEINES_GKG, type Cat, type Macros,
 } from './config/reference'
 import { MACROS, NOM_MACRO, cuilleres, equilibrer, nombre, normaliser, type Resultat } from './engine/plate'
-import { besoins, kcal, verifierProfil, type Activite, type Besoins, type Profil, type Sexe } from './engine/profile'
+import { besoins, kcal, objectifDe, verifierProfil, type Activite, type Besoins, type Objectif, type Profil, type Sexe } from './engine/profile'
 import { charger, fusionner, sauver, type DernierAliment } from './store'
 
 type Ecran = 'profil' | 'saisie' | 'resultat' | 'reglages'
@@ -58,6 +58,7 @@ function profilTexte(p?: Profil) {
   return {
     poids: p ? fr(p.poids) : '', poidsVise: p ? fr(p.poidsVise) : '', taille: p ? String(p.taille) : '',
     age: p ? String(p.age) : '', sexe: (p?.sexe ?? 'femme') as Sexe, activite: (p?.activite ?? 'leger') as Activite,
+    objectif: (p ? objectifDe(p) : 'perte') as Objectif,
   }
 }
 const profilValide = () => (donnees.profil && !verifierProfil(donnees.profil) ? donnees.profil : undefined)
@@ -81,6 +82,8 @@ function formProfil(action: string, libelle: string) {
         ${champNombre('data-p="poids"', p.poids, 'Poids', 'kg')}
         ${champNombre('data-p="poidsVise"', p.poidsVise, 'Poids visé', 'kg')}
       </div>
+      <p class="groupe-titre">Objectif</p>
+      ${bascule('Objectif', 'objectif', Object.entries(OBJECTIFS).map(([v, o]) => [v, o.nom]), p.objectif)}
       <label class="champ">Activité
         <span class="saisie"><select data-p="activite">${activites.map(([v, t]) => `<option value="${v}" ${p.activite === v ? 'selected' : ''}>${t}</option>`).join('')}</select><span class="unite" aria-hidden="true">▾</span></span>
       </label>
@@ -103,7 +106,7 @@ function ecranProfil() {
 
 function lireProfil(): Profil {
   const p = s.profil
-  return { poids: nombre(p.poids), poidsVise: nombre(p.poidsVise), taille: nombre(p.taille), age: nombre(p.age), sexe: p.sexe, activite: p.activite }
+  return { poids: nombre(p.poids), poidsVise: nombre(p.poidsVise), taille: nombre(p.taille), age: nombre(p.age), sexe: p.sexe, activite: p.activite, objectif: p.objectif }
 }
 function enregistrerProfil(): boolean {
   const p = lireProfil()
@@ -313,7 +316,7 @@ function carteAssiette(b: Besoins) {
         <span><b>${fr(r.g, 0)} g</b>glucides</span><span><b>${fr(r.p, 0)} g</b>protéines</span><span><b>${fr(r.l, 0)} g</b>lipides</span><span><b>${fr(kcal(r), 0)}</b>kcal</span>
       </div>
       <p class="aide">Dépense du jour ≈ ${fr(b.depense, 0)} kcal · apport visé ≈ ${fr(b.apport, 0)} kcal.</p>
-      <p>${b.maintien ? 'Poids visé atteint : on vise le maintien.' : `Rythme estimé : environ ${fr(b.perteParSemaine)} kg par semaine.`}</p>
+      <p>${b.objectif === 'perte' ? `Rythme estimé : environ ${fr(b.perteParSemaine)} kg par semaine.` : b.objectif === 'masse' ? `Prise estimée : environ ${fr(-b.perteParSemaine)} kg par semaine.` : 'Entre deux : on vise le maintien.'}</p>
       ${b.glucidesBas ? '<p class="message info">Il reste moins de 100 g de glucides par jour. Pour garder de l’énergie, réduis un peu le déficit.</p>' : ''}
     </section>`
 }
@@ -346,7 +349,7 @@ function ecranReglages() {
       <label class="champ">Déficit calorique : <output id="val-deficit">${pct(b.deficitApplique)} %</output>
         <input type="range" class="curseur" min="0" max="${DEFICIT.max * 100}" step="${DEFICIT.pas * 100}" value="${pct(b.deficitApplique)}" data-r="deficit" ${b.maintien ? 'disabled' : ''}>
       </label>
-      ${b.maintien ? '<p class="aide">Ton poids visé est atteint ou au-dessus : le déficit reste à 0 %.</p>' : '<p class="aide">Plafonné à 750 kcal par jour, et jamais sous ton métabolisme de base.</p>'}
+      ${b.maintien ? '<p class="aide">Ton objectif n’est pas une perte de poids : le déficit reste à 0 %. Change d’objectif dans ton profil.</p>' : '<p class="aide">Plafonné à 750 kcal par jour, et jamais sous ton métabolisme de base.</p>'}
       <p class="groupe-titre">Priorité protéines</p>
       ${bascule('Priorité protéines', 'proteines', [[PROTEINES_GKG.standard, 'Standard'], [PROTEINES_GKG.muscle, 'Muscle'], [PROTEINES_GKG.maximum, 'Maximum']], r.proteinesGkg)}
       <p class="aide">${fr(r.proteinesGkg)} g par kg de poids visé. Plus de protéines aide à garder tes muscles pendant un déficit.</p>
@@ -376,7 +379,7 @@ function ecranReglages() {
       <button type="button" class="btn-doux press" data-a="effacerProfil">Effacer mon profil</button>
     </section>
     <section class="carte">
-      <h3 class="groupe-titre">À propos · v1.4</h3>
+      <h3 class="groupe-titre">À propos · v1.4.1</h3>
       <p class="aide">Assiette calcule tes besoins à partir de ton profil et t’aide à équilibrer chaque assiette. Tout reste dans ce navigateur : pas de compte, pas de cookie, aucune connexion. Valeurs des aliments d’après la table Ciqual de l’ANSES.</p>
       ${MENTION}
     </section>
@@ -450,6 +453,10 @@ app.addEventListener('click', (ev) => {
     case 'sexe':
       s.profil.sexe = v as Sexe
       document.querySelectorAll('[data-a="sexe"]').forEach((b) => b.setAttribute('aria-pressed', String(b === el)))
+      return
+    case 'objectif':
+      s.profil.objectif = v as Objectif
+      document.querySelectorAll('[data-a="objectif"]').forEach((b) => b.setAttribute('aria-pressed', String(b === el)))
       return
     case 'proteines':
     case 'part':

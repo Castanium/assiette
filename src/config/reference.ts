@@ -20,7 +20,15 @@ export const PROTEINES_GKG = { standard: 1.2, muscle: 1.8, maximum: 2.2 }
 export const PROTEINES_DEFAUT = PROTEINES_GKG.muscle
 export const PARTS_REPAS = [0.7, 0.75, 0.8]
 export const PART_REPAS_DEFAUT = 0.75
-export const LIPIDES_MIN = { gkg: 0.8, partKcal: 0.25 }
+// Objectif choisi dans le profil : énergie et part des lipides (ANSES 2016 : lipides 35 à 40 % des kcal).
+// Les glucides prennent le reste ; repas et collations gardent les proportions de la journée.
+export const OBJECTIFS = {
+  perte: { nom: 'Perte de poids', lipides: 0.35 }, // déficit réglable
+  equilibre: { nom: 'Entre deux', lipides: 0.35 }, // maintien
+  masse: { nom: 'Prise de masse', lipides: 0.3 }, // surplus
+}
+export const SURPLUS_MASSE = 0.1
+export const LIPIDES_MIN_GKG = 0.8
 export const PLANCHER_PROTEINES_REPAS_GKG = 0.4
 export const GLUCIDES_BAS_JOUR = 100
 export const KCAL_PAR_KG = 7700

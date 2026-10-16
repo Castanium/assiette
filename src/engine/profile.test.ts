@@ -13,13 +13,13 @@ describe('profil type', () => {
   })
   it('macros du jour', () => {
     expect(b.jour.p).toBeCloseTo(144)
-    expect(b.jour.l).toBeCloseTo(64) // 0,8 × 80 > 25 % de 2168 / 9 = 60,2
-    expect(b.jour.g).toBeCloseTo(254, 0)
+    expect(b.jour.l).toBeCloseTo(84.3, 1) // perte : 35 % de 2168 / 9 = 84,3 > 0,8 × 80
+    expect(b.jour.g).toBeCloseTo(208.3, 1)
   })
   it('repas principal à 37,5 % et collations à 25 %', () => {
     expect(b.repas.p).toBeCloseTo(54)
-    expect(b.repas.l).toBeCloseTo(24)
-    expect(b.repas.g).toBeCloseTo(95.3, 0)
+    expect(b.repas.l).toBeCloseTo(31.6, 1)
+    expect(b.repas.g).toBeCloseTo(78.1, 1)
     expect(kcal(b.repas)).toBeCloseTo(813, 0)
     expect(kcal(b.collations)).toBeCloseTo(542, 0)
     expect(b.collations.p).toBeCloseTo(36)
@@ -76,5 +76,35 @@ describe('garde-fous des besoins', () => {
   })
   it('Mifflin-St Jeor femme', () => {
     expect(mifflin({ sexe: 'femme', poids: 65, taille: 165, age: 40 })).toBeCloseTo(1320.25)
+  })
+})
+
+describe('objectif du profil', () => {
+  it('déduit du poids visé pour un profil enregistré avant la v1.4.1', () => {
+    expect(besoins(homme, reglages).objectif).toBe('perte')
+    expect(besoins({ ...homme, poidsVise: 90 }, reglages).objectif).toBe('equilibre')
+    expect(besoins({ ...homme, poidsVise: 95 }, reglages).objectif).toBe('masse')
+  })
+  it('entre deux : maintien, lipides à 35 %', () => {
+    const b = besoins({ ...homme, objectif: 'equilibre' }, reglages)
+    expect(b.maintien).toBe(true)
+    expect(b.apport).toBeCloseTo(b.depense)
+    expect((b.jour.l * 9) / b.apport).toBeCloseTo(0.35)
+  })
+  it('prise de masse : +10 %, lipides à 30 %, glucides au-dessus de la perte', () => {
+    const b = besoins({ ...homme, poidsVise: 95, objectif: 'masse' }, reglages)
+    expect(b.apport).toBeCloseTo(b.depense * 1.1)
+    expect((b.jour.l * 9) / b.apport).toBeCloseTo(0.3)
+    expect(b.perteParSemaine).toBeLessThan(0)
+    expect(b.repas.g).toBeGreaterThan(besoins(homme, reglages).repas.g)
+  })
+  it('repas et collations gardent les proportions de la journée', () => {
+    const b = besoins(homme, reglages)
+    for (const k of ['g', 'p', 'l'] as const) expect(b.repas[k] / b.jour[k]).toBeCloseTo(0.375)
+  })
+  it('objectif incohérent avec le poids visé refusé', () => {
+    expect(verifierProfil({ ...homme, objectif: 'perte', poidsVise: 90 })).toMatch(/perte/)
+    expect(verifierProfil({ ...homme, objectif: 'masse' })).toMatch(/masse/)
+    expect(verifierProfil({ ...homme, objectif: 'equilibre' })).toBeUndefined()
   })
 })
